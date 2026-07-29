@@ -44,3 +44,6 @@ i18n
 AGENTS.md
 .serena/
 .direnv/
+.claude/
+.tokensave/
+PLAN.md
