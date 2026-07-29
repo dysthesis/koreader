@@ -2,6 +2,8 @@
   description = "KOReader development and package flake";
 
   inputs = {
+    self.submodules = true;
+
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

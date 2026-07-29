@@ -160,12 +160,23 @@ export MACOSX_DEPLOYMENT_TARGET=10.09
 
 ### Nix
 
-Ensure the [nix is installed](https://nixos.org/download/).
+Ensure [Nix](https://nixos.org/download/) is installed with flakes enabled.
+Enter the development environment with:
 
-Then simply run the included nix shell:
 ```
-nix-shell tools/shell.nix
+nix develop
 ```
+
+On x86-64 Linux, build final Kobo release archives with:
+
+```
+nix build .#kobo
+nix build .#kobov4
+nix build .#kobov5
+```
+
+Each result contains the install ZIP and both OTA formats (`.tar.xz` and
+`.targz`).
 
 ### openSUSE
 
