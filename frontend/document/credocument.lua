@@ -1315,6 +1315,11 @@ function CreDocument:setWordSpacing(values)
     self._document:setIntProperty("crengine.style.space.condensing.percent", values[2])
 end
 
+function CreDocument:setOptimalLineBreaking(enabled)
+    logger.dbg("CreDocument: set optimal line breaking", enabled)
+    self._document:setIntProperty("crengine.style.optimal.line.breaking", enabled and 1 or 0)
+end
+
 function CreDocument:setWordExpansion(value)
     logger.dbg("CreDocument: set word expansion", value)
     self._document:setIntProperty("crengine.style.max.added.letter.spacing.percent", value or 0)

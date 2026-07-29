@@ -128,6 +128,7 @@ function ReaderTypography:init()
     self.hyph_trust_soft_hyphens = false
     self.hyph_soft_hyphens_only = false
     self.hyph_force_algorithmic = false
+    self.optimal_line_breaking = false
     self.floating_punctuation = 0
 
     local info_text = _([[
@@ -555,6 +556,37 @@ These settings will apply to all books with any hyphenation dictionary.
     })
 
     table.insert(self.menu_table, {
+        text = _("Optimal line breaking"),
+        checked_func = function()
+            return self.optimal_line_breaking
+        end,
+        callback = function()
+            self.optimal_line_breaking = not self.optimal_line_breaking
+            self.ui.document:setOptimalLineBreaking(self.optimal_line_breaking)
+            self.ui:handleEvent(Event:new("UpdatePos"))
+        end,
+        hold_callback = function()
+            local optimal_line_breaking = G_reader_settings:isTrue("optimal_line_breaking")
+            UIManager:show(MultiConfirmBox:new{
+                text = optimal_line_breaking and _("Would you like to enable or disable optimal line breaking by default?\n\nThe current default (★) is enabled.")
+                or _("Would you like to enable or disable optimal line breaking by default?\n\nThe current default (★) is disabled."),
+                choice1_text_func = function()
+                    return optimal_line_breaking and _("Disable") or _("Disable (★)")
+                end,
+                choice1_callback = function()
+                    G_reader_settings:makeFalse("optimal_line_breaking")
+                end,
+                choice2_text_func = function()
+                    return optimal_line_breaking and _("Enable (★)") or _("Enable")
+                end,
+                choice2_callback = function()
+                    G_reader_settings:makeTrue("optimal_line_breaking")
+                end,
+            })
+        end,
+    })
+
+    table.insert(self.menu_table, {
         -- @translators See https://en.wikipedia.org/wiki/Hanging_punctuation
         text = _("Hanging punctuation"),
         checked_func = function() return self.floating_punctuation == 1 end,
@@ -760,6 +792,14 @@ function ReaderTypography:onReadSettings(config)
     self.ui.document:setHyphLeftHyphenMin(G_reader_settings:readSetting("hyph_left_hyphen_min") or 0)
     self.ui.document:setHyphRightHyphenMin(G_reader_settings:readSetting("hyph_right_hyphen_min") or 0)
 
+    -- Default to standard greedy line breaking
+    if config:has("optimal_line_breaking") then
+        self.optimal_line_breaking = config:isTrue("optimal_line_breaking")
+    else
+        self.optimal_line_breaking = G_reader_settings:isTrue("optimal_line_breaking")
+    end
+    self.ui.document:setOptimalLineBreaking(self.optimal_line_breaking)
+
     -- Default to disable hanging/floating punctuation
     -- (Stored as 0/1 in docsetting for historical reasons, but as true/false
     -- in global settings.)
@@ -854,6 +894,7 @@ function ReaderTypography:onSaveSettings()
     self.ui.doc_settings:saveSetting("hyph_trust_soft_hyphens", self.hyph_trust_soft_hyphens)
     self.ui.doc_settings:saveSetting("hyph_soft_hyphens_only", self.hyph_soft_hyphens_only)
     self.ui.doc_settings:saveSetting("hyph_force_algorithmic", self.hyph_force_algorithmic)
+    self.ui.doc_settings:saveSetting("optimal_line_breaking", self.optimal_line_breaking)
     self.ui.doc_settings:saveSetting("floating_punctuation", self.floating_punctuation)
 end
 
