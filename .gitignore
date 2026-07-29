@@ -48,3 +48,4 @@ AGENTS.md
 .tokensave/
 PLAN.md
 /kp-fuzz/
+core.*

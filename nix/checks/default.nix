@@ -27,7 +27,15 @@
         # for them. Guard so eval still succeeds without.
         if builtins.pathExists (crengine + "/.clang-tidy") then
           {
-            kp-selfcheck = import ./kp-selfcheck.nix { inherit pkgs src; };
+            # Two compilers: their UBSan and warning coverage differ.
+            kp-selfcheck-clang = import ./kp-selfcheck.nix {
+              inherit pkgs src;
+              stdenv = pkgs.clangStdenv;
+            };
+            kp-selfcheck-gcc = import ./kp-selfcheck.nix {
+              inherit pkgs src;
+              inherit (pkgs) stdenv;
+            };
             kp-clang-tidy = import ./kp-clang-tidy.nix { inherit pkgs src; };
             kp-cppcheck = import ./kp-cppcheck.nix { inherit pkgs src; };
           }
