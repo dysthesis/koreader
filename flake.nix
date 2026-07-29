@@ -17,6 +17,7 @@
       imports = [
         ./nix/shell.nix
         ./nix/formatter.nix
+        ./nix/package.nix
       ];
 
       systems = [
