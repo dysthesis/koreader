@@ -22,6 +22,7 @@
           gnused
           gnutar
           gzip
+          just
           libtool
           luajit
           luajitPackages.luacheck

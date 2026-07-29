@@ -16,6 +16,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         ./nix/checks
+        ./nix/fuzz.nix
         ./nix/shell.nix
         ./nix/formatter.nix
         ./nix/package.nix

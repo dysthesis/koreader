@@ -47,3 +47,4 @@ AGENTS.md
 .claude/
 .tokensave/
 PLAN.md
+/kp-fuzz/
