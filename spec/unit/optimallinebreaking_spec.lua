@@ -1,5 +1,5 @@
 describe("Optimal line breaking", function()
-    local DocSettings, DocumentRegistry, Geom, ReaderUI, UIManager
+    local Blitbuffer, DocSettings, DocumentRegistry, Geom, ReaderUI, UIManager
     local filename
     local old_global_setting
     local readerui
@@ -7,6 +7,7 @@ describe("Optimal line breaking", function()
     setup(function()
         require("commonrequire")
         disable_plugins()
+        Blitbuffer = require("ffi/blitbuffer")
         DocSettings = require("docsettings")
         DocumentRegistry = require("document/documentregistry")
         Geom = require("ui/geometry")
@@ -26,9 +27,18 @@ describe("Optimal line breaking", function()
 body { margin: 0; font-family: "Droid Sans Mono"; font-size: 20px; line-height: 1; }
 p { margin: 0; text-align: justify; }
 </style></head><body>
+<div style="page-break-after: always">
+<p><span style="float: left; width: 72px">cedar</span> alder birch dogwood elm fir gum hawthorn ironwood juniper larch maple</p>
+<p>漢字仮名交じり文の行分割検証用文章です。</p>
+<p style="white-space: pre">preformatted    spacing stays fixed</p>
+<p>pneumonoultramicroscopicsilicovolcanoconiosis</p>
+<p lang="pl">bursztynowego-szafirowego</p>
+</div>
+<div>
 <p>alpha <span style="white-space: nowrap">bravo charlie delta echo foxtrot golf hotel india</span> juliet kilo lima mike november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu</p>
 <p>amber <span style="white-space: nowrap">onyx azure</span> diamond emerald fossil granite hotel ivory jasper kelp lemon marble nickel olive pearl quartz ruby silver topaz</p>
 <p>atlas <span style="display: inline-block">cobalt</span> nimbus fir grove hazel ivory juniper kelp lemon</p>
+</div>
 </body></html>]])
         file:close()
 
@@ -66,6 +76,27 @@ p { margin: 0; text-align: justify; }
     local function word_y(word)
         return word_pos(word)
     end
+
+    local function page_pixels()
+        local bb = Blitbuffer.new(240, 600)
+        bb:fill(Blitbuffer.COLOR_WHITE)
+        readerui.view:drawSinglePage(bb, 0, 0)
+        local pixels = Blitbuffer.tostring(bb)
+        bb:free()
+        return pixels
+    end
+
+    it("preserves greedy pixels for excluded and infeasible paragraphs", function()
+        readerui.document:setOptimalLineBreaking(false)
+        readerui.document:render()
+        local greedy_pixels = page_pixels()
+
+        readerui.document:setOptimalLineBreaking(true)
+        readerui.document:render()
+        assert.is_true(greedy_pixels == page_pixels())
+        assert.are_not.equal(word_y("pneumonoultramicroscopic"), word_y("silicovolcanoconiosis"))
+        assert.are_not.equal(word_y("bursztynowego"), word_y("szafirowego"))
+    end)
 
     it("uses nowrap breaks only when the strict passes are infeasible", function()
         assert.are.equal(word_y("alpha"), word_y("bravo"))
