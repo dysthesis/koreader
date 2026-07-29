@@ -28,6 +28,7 @@ p { margin: 0; text-align: justify; }
 </style></head><body>
 <p>alpha <span style="white-space: nowrap">bravo charlie delta echo foxtrot golf hotel india</span> juliet kilo lima mike november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu</p>
 <p>amber <span style="white-space: nowrap">onyx azure</span> diamond emerald fossil granite hotel ivory jasper kelp lemon marble nickel olive pearl quartz ruby silver topaz</p>
+<p>atlas <span style="display: inline-block">cobalt</span> nimbus fir grove hazel ivory juniper kelp lemon</p>
 </body></html>]])
         file:close()
 
@@ -56,15 +57,26 @@ p { margin: 0; text-align: justify; }
         end
     end)
 
-    local function word_y(word)
+    local function word_pos(word)
         local hits = readerui.document:findAllText(word, false, 0, 1, false)
         assert.is_truthy(hits and hits[1], word)
         return readerui.document:getPosFromXPointer(hits[1].start)
+    end
+
+    local function word_y(word)
+        return word_pos(word)
     end
 
     it("uses nowrap breaks only when the strict passes are infeasible", function()
         assert.are.equal(word_y("alpha"), word_y("bravo"))
         assert.are_not.equal(word_y("bravo"), word_y("charlie"))
         assert.are.equal(word_y("onyx"), word_y("azure"))
+    end)
+
+    it("positions inline boxes on optimised lines", function()
+        local before_y, before_x = word_pos("atlas")
+        local inline_y, inline_x = word_pos("cobalt")
+        assert.are.equal(before_y, inline_y)
+        assert.is_true(before_x < inline_x)
     end)
 end)
