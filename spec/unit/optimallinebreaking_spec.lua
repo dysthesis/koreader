@@ -119,8 +119,7 @@ p { margin: 0; text-align: justify; }
     local function page_pixels(page)
         local bb = Blitbuffer.new(240, 600)
         bb:fill(Blitbuffer.COLOR_WHITE)
-        local rect = Geom:new{ w = 240, h = 600 }
-        readerui.document:drawCurrentViewByPage(bb, 0, 0, rect, page)
+        readerui.document:drawCurrentViewByPage(bb, 0, 0, readerui.dimen, page)
         local pixels = Blitbuffer.tostring(bb)
         bb:free()
         return pixels
