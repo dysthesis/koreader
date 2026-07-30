@@ -18,6 +18,8 @@
       ];
       releaseEpoch = self.lastModified or 1;
       sourceVersion = "${pkgs.koreader.version}-${revision}";
+      # git-rev must be `git describe`-shaped; version.lua's pattern needs the "v".
+      releaseVersion = "v${pkgs.koreader.version}-0-g${revision}";
 
       toolchainVersion = "2025.05";
       koboTargets = {
@@ -411,7 +413,7 @@
               USE_NO_CCACHE=1 \
               OUTPUT_DIR="$TMPDIR/build" \
               INSTALL_DIR="$TMPDIR/install" \
-              VERSION=${lib.escapeShellArg sourceVersion} \
+              VERSION=${lib.escapeShellArg releaseVersion} \
               RELEASE_DATE=${lib.escapeShellArg releaseDate} \
               RELEASE_EPOCH=@${toString releaseEpoch} \
               update
@@ -424,7 +426,7 @@
 
             mkdir -p "$out"
             for extension in zip tar.xz targz; do
-              artifact="koreader-${target}-${sourceVersion}.$extension"
+              artifact="koreader-${target}-${releaseVersion}.$extension"
               [[ -s "$artifact" ]]
               install -m644 "$artifact" "$out/"
             done
@@ -470,7 +472,7 @@
             ${self}/defaults.lua \
             ${self}/datastorage.lua \
             "$payload/"
-          printf '%s\n' ${lib.escapeShellArg revision} > "$payload/git-rev"
+          printf '%s\n' ${lib.escapeShellArg releaseVersion} > "$payload/git-rev"
         '';
 
         passthru = (old.passthru or { }) // {
