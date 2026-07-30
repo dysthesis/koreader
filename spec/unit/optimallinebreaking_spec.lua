@@ -40,6 +40,12 @@ p { margin: 0; text-align: justify; }
 <p>atlas <span style="display: inline-block">cobalt</span> nimbus fir grove hazel ivory juniper kelp lemon</p>
 <p style="font-size: 8px">zebu yak okapi</p>
 <p style="font-size: 8px">quill lantern harbour meadow cobbler thistle brazier walnut ferment gospel hazard jonquil kestrel lumber mantis nutmeg opulent pigment quarry rustic saffron tundra vellum wharf xenon yodel zircon anvil bramble cinder dapple fathom girder hovel inkwell jetty kindle loftier mulberry nectar oyster parlour quiver sundial tempest upland vagrant willow yeoman zephyr</p>
+<p style="text-align: right; font-size: 12px">edgepin</p>
+<p style="font-size: 12px">qaa qbb qcc qdd qee qff qgg qhh qii qjj qkk qll qmm qnn qoo qpp qqq qrr qss qtt</p>
+<p style="text-align: left"><span style="font-size: 10px">caax </span><span style="font-size: 10px">cbbx</span></p>
+<p style="text-align: left"><span style="font-size: 20px">caan </span><span style="font-size: 20px">cbbn</span></p>
+<p style="text-align: left"><span style="font-size: 30px">caat </span><span style="font-size: 30px">cbbt</span></p>
+<p><span style="font-size: 10px">mxa </span><span style="font-size: 20px">mxb </span><span style="font-size: 30px">mxc </span><span style="font-size: 10px">mxd </span><span style="font-size: 20px">mxe </span><span style="font-size: 30px">mxf </span><span style="font-size: 10px">mxg </span><span style="font-size: 20px">mxh </span><span style="font-size: 30px">mxi </span><span style="font-size: 10px">mxj </span><span style="font-size: 20px">mxk </span><span style="font-size: 30px">mxl</span></p>
 </div>
 </body></html>]])
         file:close()
@@ -69,10 +75,18 @@ p { margin: 0; text-align: justify; }
         end
     end)
 
-    local function word_pos(word)
+    local function word_hit(word)
         local hits = readerui.document:findAllText(word, false, 0, 1, false)
         assert.is_truthy(hits and hits[1], word)
-        return readerui.document:getPosFromXPointer(hits[1].start)
+        return hits[1]
+    end
+
+    local function word_pos(word)
+        return readerui.document:getPosFromXPointer(word_hit(word).start)
+    end
+
+    local function word_end_pos(word)
+        return readerui.document:getPosFromXPointer(word_hit(word)["end"])
     end
 
     local function word_y(word)
@@ -101,9 +115,83 @@ p { margin: 0; text-align: justify; }
     end)
 
     it("uses nowrap breaks only when the strict passes are infeasible", function()
-        assert.are.equal(word_y("alpha"), word_y("bravo"))
-        assert.are_not.equal(word_y("bravo"), word_y("charlie"))
+        assert.are_not.equal(word_y("bravo"), word_y("india"))
         assert.are.equal(word_y("onyx"), word_y("azure"))
+    end)
+
+    it("lands every non-final justified line on the exact advance edge", function()
+        local _, edge_x = word_end_pos("edgepin")
+        local by_line = {}
+        for word in ([[qaa qbb qcc qdd qee qff qgg qhh qii qjj qkk qll qmm qnn
+                qoo qpp qqq qrr qss qtt]]):gmatch("%a+") do
+            local y, x = word_pos(word)
+            local _, end_x = word_end_pos(word)
+            by_line[y] = by_line[y] or {}
+            table.insert(by_line[y], { x = x, end_x = end_x })
+        end
+
+        local line_count = 0
+        local last_y = 0
+        for y in pairs(by_line) do
+            line_count = line_count + 1
+            last_y = math.max(last_y, y)
+        end
+        assert.is_true(line_count > 1)
+        for y, line in pairs(by_line) do
+            if y ~= last_y then
+                table.sort(line, function(a, b) return a.x < b.x end)
+                assert.are.equal(edge_x, line[#line].end_x)
+            end
+        end
+    end)
+
+    it("adjusts mixed-font spaces proportionally", function()
+        local function natural_space(first, second)
+            local _, first_end = word_end_pos(first)
+            local _, second_start = word_pos(second)
+            return second_start - first_end
+        end
+
+        local natural = {
+            [10] = natural_space("caax", "cbbx"),
+            [20] = natural_space("caan", "cbbn"),
+            [30] = natural_space("caat", "cbbt"),
+        }
+        local words = {
+            { "mxa", 10 }, { "mxb", 20 }, { "mxc", 30 }, { "mxd", 10 },
+            { "mxe", 20 }, { "mxf", 30 }, { "mxg", 10 }, { "mxh", 20 },
+            { "mxi", 30 }, { "mxj", 10 }, { "mxk", 20 }, { "mxl", 30 },
+        }
+        local first_y = word_y(words[1][1])
+        assert.are_not.equal(first_y, word_y(words[#words][1]))
+        local adjustments = {}
+        local has_adjustment = false
+        for i = 1, #words - 1 do
+            if word_y(words[i + 1][1]) ~= first_y then
+                break
+            end
+            local _, word_end = word_end_pos(words[i][1])
+            local _, next_start = word_pos(words[i + 1][1])
+            local size = words[i][2]
+            local amount = next_start - word_end - natural[size]
+            has_adjustment = has_adjustment or amount ~= 0
+            table.insert(adjustments, {
+                amount = amount,
+                natural = natural[size],
+            })
+        end
+        assert.is_true(#adjustments >= 3)
+        assert.is_true(has_adjustment)
+        local _, edge_x = word_end_pos("edgepin")
+        local _, line_end_x = word_end_pos(words[#adjustments + 1][1])
+        assert.are.equal(edge_x, line_end_x)
+        for i = 2, #adjustments do
+            local left = adjustments[i - 1]
+            local right = adjustments[i]
+            local cross_error = math.abs(left.amount * right.natural - right.amount * left.natural)
+            assert.is_true(cross_error <= left.natural + right.natural, string.format(
+                "adjustments %d/%d and %d/%d", left.amount, left.natural, right.amount, right.natural))
+        end
     end)
 
     it("keeps word spacing even across justified lines", function()
@@ -128,11 +216,13 @@ p { margin: 0; text-align: justify; }
             table.insert(by_line[y], { word = word, x = x })
         end
 
+        local narrowest = math.huge
         local widest = 0
         for _, line in pairs(by_line) do
             table.sort(line, function(a, b) return a.x < b.x end)
             for i = 2, #line do
                 local gap = line[i].x - line[i-1].x - #line[i-1].word * advance
+                narrowest = math.min(narrowest, gap / space)
                 widest = math.max(widest, gap / space)
             end
         end
@@ -145,6 +235,8 @@ p { margin: 0; text-align: justify; }
             end
             print(string.format("y=%d: %s", y, table.concat(parts, " ")))
         end
+        assert.is_true(narrowest < 1, string.format("narrowest gap %.2f spaces", narrowest))
+        assert.is_true(widest > 1, string.format("widest gap %.2f spaces", widest))
         assert.is_true(widest < 1.6, string.format("widest gap %.2f spaces", widest))
     end)
 
