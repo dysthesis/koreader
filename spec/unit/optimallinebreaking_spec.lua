@@ -1,6 +1,7 @@
 describe("Optimal line breaking", function()
     local Blitbuffer, DocSettings, DocumentRegistry, Geom, ReaderUI, UIManager
     local filename
+    local old_floating_punctuation
     local old_global_setting
     local readerui
 
@@ -17,7 +18,9 @@ describe("Optimal line breaking", function()
 
     before_each(function()
         old_global_setting = G_reader_settings:readSetting("optimal_line_breaking")
+        old_floating_punctuation = G_reader_settings:readSetting("floating_punctuation")
         G_reader_settings:delSetting("optimal_line_breaking")
+        G_reader_settings:delSetting("floating_punctuation")
 
         local tmpname = os.tmpname()
         os.remove(tmpname)
@@ -26,6 +29,7 @@ describe("Optimal line breaking", function()
         file:write([[<!doctype html><html><head><style>
 body { margin: 0; font-family: "Droid Sans Mono"; font-size: 20px; line-height: 1; }
 p { margin: 0; text-align: justify; }
+.noindent p { text-indent: 0; }
 </style></head><body>
 <div style="page-break-after: always">
 <p><span style="float: left; width: 72px">cedar</span> alder birch dogwood elm fir gum hawthorn ironwood juniper larch maple</p>
@@ -46,6 +50,20 @@ p { margin: 0; text-align: justify; }
 <p style="text-align: left"><span style="font-size: 20px">caan </span><span style="font-size: 20px">cbbn</span></p>
 <p style="text-align: left"><span style="font-size: 30px">caat </span><span style="font-size: 30px">cbbt</span></p>
 <p><span style="font-size: 10px">mxa </span><span style="font-size: 20px">mxb </span><span style="font-size: 30px">mxc </span><span style="font-size: 10px">mxd </span><span style="font-size: 20px">mxe </span><span style="font-size: 30px">mxf </span><span style="font-size: 10px">mxg </span><span style="font-size: 20px">mxh </span><span style="font-size: 30px">mxi </span><span style="font-size: 10px">mxj </span><span style="font-size: 20px">mxk </span><span style="font-size: 30px">mxl</span></p>
+</div>
+<div class="noindent" style="page-break-before: always; page-break-after: always; margin: 0 30px; font-family: 'Noto Sans'; hyphens: none">
+<p style="text-align: left">nleftpin</p>
+<p style="text-align: right">rightpinm</p>
+<p style="text-align: left">"qleftcontrol</p>
+<p style="text-align: right">qrightcontrol,</p>
+<p>"haaa, "hbbb, "hccc, "hddd, "heee, "hfff, "hggg, "hhhh, "hiii, "hjjj, "hkkk, "hlll, "hmmm, "hnnn, "hooo, "hppp, "hqqq, "hrrr, "hsss, "httt,</p>
+</div>
+<div class="noindent" style="page-break-after: always; font-family: 'Noto Sans'; font-style: italic; background: white; hyphens: none">
+<p style="text-align: left">nnegativeleft</p>
+<p style="text-align: left">Jnegativeleft</p>
+<p style="text-align: right">negativerightm</p>
+<p style="text-align: right">negativerightf</p>
+<p>Jaf Jbf Jcf Jdf Jef Jff Jgf Jhf Jif Jjf Jkf Jlf Jmf Jnf Jof Jpf Jqf Jrf Jsf Jtf</p>
 </div>
 </body></html>]])
         file:close()
@@ -73,6 +91,11 @@ p { margin: 0; text-align: justify; }
         else
             G_reader_settings:saveSetting("optimal_line_breaking", old_global_setting)
         end
+        if old_floating_punctuation == nil then
+            G_reader_settings:delSetting("floating_punctuation")
+        else
+            G_reader_settings:saveSetting("floating_punctuation", old_floating_punctuation)
+        end
     end)
 
     local function word_hit(word)
@@ -93,23 +116,29 @@ p { margin: 0; text-align: justify; }
         return word_pos(word)
     end
 
-    local function page_pixels()
+    local function page_pixels(page)
         local bb = Blitbuffer.new(240, 600)
         bb:fill(Blitbuffer.COLOR_WHITE)
-        readerui.view:drawSinglePage(bb, 0, 0)
+        local rect = Geom:new{ w = 240, h = 600 }
+        readerui.document:drawCurrentViewByPage(bb, 0, 0, rect, page)
         local pixels = Blitbuffer.tostring(bb)
         bb:free()
         return pixels
     end
 
+    local function page_pixels_at(word)
+        local page = readerui.document:getPageFromXPointer(word_hit(word).start)
+        return page_pixels(page)
+    end
+
     it("preserves greedy pixels for excluded and infeasible paragraphs", function()
         readerui.document:setOptimalLineBreaking(false)
         readerui.document:render()
-        local greedy_pixels = page_pixels()
+        local greedy_pixels = page_pixels_at("cedar")
 
         readerui.document:setOptimalLineBreaking(true)
         readerui.document:render()
-        assert.is_true(greedy_pixels == page_pixels())
+        assert.is_true(greedy_pixels == page_pixels_at("cedar"))
         assert.are_not.equal(word_y("pneumonoultramicroscopic"), word_y("silicovolcanoconiosis"))
         assert.are_not.equal(word_y("bursztynowego"), word_y("szafirowego"))
     end)
@@ -245,5 +274,92 @@ p { margin: 0; text-align: justify; }
         local inline_y, inline_x = word_pos("cobalt")
         assert.are.equal(before_y, inline_y)
         assert.is_true(before_x < inline_x)
+    end)
+
+    it("scores and renders hanging punctuation at both line edges", function()
+        local _, left_edge = word_pos("nleftpin")
+        local _, right_edge = word_end_pos("rightpinm")
+        local _, quote_end = word_pos("qleftcontrol")
+        local _, comma_start = word_end_pos("qrightcontrol")
+        local quote_width = quote_end - left_edge
+        local comma_width = right_edge - comma_start
+        assert.is_true(quote_width > 0)
+        assert.is_true(comma_width > 0)
+        readerui.document:setFloatingPunctuation(1)
+        readerui.document:render()
+
+        local left_hang = math.max(1, math.floor(quote_width * 50 / 100))
+        local right_hang = math.max(1, math.floor(comma_width * 70 / 100))
+        local by_line = {}
+        for word in ([[haaa hbbb hccc hddd heee hfff hggg hhhh hiii hjjj
+                hkkk hlll hmmm hnnn hooo hppp hqqq hrrr hsss httt]]):gmatch("%a+") do
+            local y, x = word_pos(word)
+            local _, end_x = word_end_pos(word)
+            by_line[y] = by_line[y] or {}
+            table.insert(by_line[y], {
+                x = x,
+                end_x = end_x,
+            })
+        end
+
+        local line_count = 0
+        local last_y = 0
+        for y in pairs(by_line) do
+            line_count = line_count + 1
+            last_y = math.max(last_y, y)
+        end
+        assert.is_true(line_count > 1)
+        for y, line in pairs(by_line) do
+            table.sort(line, function(a, b) return a.x < b.x end)
+            assert.are.equal(left_edge + quote_width - left_hang, line[1].x)
+            if y ~= last_y then
+                assert.are.equal(right_edge - comma_width + right_hang, line[#line].end_x)
+            end
+        end
+    end)
+
+    it("keeps negative side bearings on the exact ink edges", function()
+        readerui.document:setFloatingPunctuation(1)
+        readerui.document:render()
+
+        local _, natural_left = word_pos("nnegativeleft")
+        local _, inset_left = word_pos("Jnegativeleft")
+        local _, natural_right = word_end_pos("negativerightm")
+        local _, inset_right = word_end_pos("negativerightf")
+        assert.is_true(inset_left > natural_left)
+        assert.is_true(inset_right < natural_right)
+
+        local by_line = {}
+        for word in ([[Jaf Jbf Jcf Jdf Jef Jff Jgf Jhf Jif Jjf Jkf Jlf Jmf Jnf
+                Jof Jpf Jqf Jrf Jsf Jtf]]):gmatch("%a+") do
+            local y, x = word_pos(word)
+            local _, end_x = word_end_pos(word)
+            by_line[y] = by_line[y] or {}
+            table.insert(by_line[y], { x = x, end_x = end_x })
+        end
+
+        local line_count = 0
+        local last_y = 0
+        for y in pairs(by_line) do
+            line_count = line_count + 1
+            last_y = math.max(last_y, y)
+        end
+        assert.is_true(line_count > 1)
+        for y, line in pairs(by_line) do
+            if y ~= last_y then
+                table.sort(line, function(a, b) return a.x < b.x end)
+                assert.are.equal(inset_left, line[1].x)
+                assert.are.equal(inset_right, line[#line].end_x)
+            end
+        end
+    end)
+
+    it("hashes hanging punctuation when it affects optimal breaks", function()
+        readerui.document:setFloatingPunctuation(0)
+        readerui.document:render()
+        local without_hanging = readerui.document:getDocumentRenderingHash()
+        readerui.document:setFloatingPunctuation(1)
+        readerui.document:render()
+        assert.are_not.equal(without_hanging, readerui.document:getDocumentRenderingHash())
     end)
 end)
